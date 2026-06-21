@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日々の記録</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <div class="header-inner">
+        <div class="site-title">
+          <h1>日々の記録</h1>
+          <p class="site-tagline">模型、サウナ、旅、そして日常</p>
+        </div>
+        <nav class="site-nav" id="site-nav">
+          <button class="nav-btn active" data-category="all">すべて</button>
+          <button class="nav-btn" data-category="日記">日記</button>
+          <button class="nav-btn" data-category="模型">模型</button>
+          <button class="nav-btn" data-category="サウナ">サウナ</button>
+          <button class="nav-btn" data-category="旅行">旅行</button>
+          <button class="nav-btn" data-category="その他">その他</button>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="site-main">
+    <div class="container">
+      <div class="layout">
+
+        <section class="entries-section">
+          <div id="entries-list"></div>
+          <p id="no-entries" class="no-entries" style="display:none">この条件の記事はまだありません。</p>
+        </section>
+
+        <aside class="sidebar">
+
+          <div class="widget streak-widget">
+            <h2 class="widget-title">連続投稿</h2>
+            <div class="streak-display">
+              <span class="streak-number" id="streak-count">0</span>
+              <span class="streak-label">日連続</span>
+            </div>
+            <p class="streak-sub" id="streak-sub"></p>
+          </div>
+
+          <div class="widget calendar-widget">
+            <div class="calendar-header">
+              <button class="cal-nav-btn" id="cal-prev">&#8592;</button>
+              <h2 class="widget-title" id="calendar-title"></h2>
+              <button class="cal-nav-btn" id="cal-next">&#8594;</button>
+            </div>
+            <div class="calendar-grid" id="calendar-grid"></div>
+            <div class="calendar-legend">
+              <span class="legend-dot posted"></span><span>投稿あり</span>
+              <span class="legend-dot achieved"></span><span>500字達成</span>
+            </div>
+          </div>
+
+          <div class="widget stats-widget">
+            <h2 class="widget-title">今月の記録</h2>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <span class="stat-num" id="stat-posts">0</span>
+                <span class="stat-lbl">投稿数</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-num" id="stat-achieved">0</span>
+                <span class="stat-lbl">500字達成</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-num" id="stat-total">0</span>
+                <span class="stat-lbl">総文字数</span>
+              </div>
+            </div>
+          </div>
+
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- 記事詳細モーダル -->
+  <div id="modal-overlay" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-meta">
+        <span class="modal-date" id="modal-date"></span>
+        <span class="modal-cat" id="modal-cat"></span>
+        <span class="modal-chars" id="modal-chars"></span>
+      </div>
+      <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-body" id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 投稿パネル -->
+  <button class="fab" id="fab-btn" title="新しい記事を書く">&#43;</button>
+
+  <div id="compose-overlay" class="compose-overlay" style="display:none">
+    <div class="compose-box">
+      <div class="compose-header">
+        <h2 class="compose-heading">新しい記事</h2>
+        <button class="compose-close" id="compose-close">&times;</button>
+      </div>
+      <div class="compose-fields">
+        <input type="text" id="compose-title" class="compose-input" placeholder="タイトル" />
+        <div class="compose-row">
+          <input type="date" id="compose-date" class="compose-input compose-date" />
+          <select id="compose-cat" class="compose-input compose-select">
+            <option value="日記">日記</option>
+            <option value="模型">模型</option>
+            <option value="サウナ">サウナ</option>
+            <option value="旅行">旅行</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="textarea-wrap">
+          <textarea id="compose-body" class="compose-textarea" placeholder="今日のこと、書いてみる…" rows="10"></textarea>
+          <div class="char-bar-wrap">
+            <div class="char-bar-track">
+              <div class="char-bar-fill" id="char-bar-fill"></div>
+            </div>
+            <span class="char-count" id="char-count">0 / 500</span>
+          </div>
+        </div>
+      </div>
+      <div class="compose-footer">
+        <p class="compose-hint">記事を書いたら「JSONを生成」→ コピーして <code>entries.json</code> に貼り付けます</p>
+        <button class="compose-generate" id="compose-generate">JSONを生成する</button>
+      </div>
+      <div id="compose-json-out" class="compose-json-out" style="display:none">
+        <p class="json-label">このブロックをコピーして <code>entries.json</code> の配列（<code>[...]</code>の中）に追加してください</p>
+        <pre class="json-pre" id="json-pre"></pre>
+        <button class="copy-btn" id="copy-json-btn">コピーする</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
