@@ -697,3 +697,93 @@ body {
 }
 
 .copy-btn:hover { background: var(--accent-lt); color: var(--accent); }
+
+/* ===== 管理者ボタン（ヘッダー） ===== */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.28rem 0.8rem;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 300;
+  color: var(--text-hint);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.admin-btn:hover { border-color: var(--accent); color: var(--accent); }
+.admin-btn--out:hover { border-color: var(--warn); color: var(--warn); }
+
+/* ===== 記事カードの編集ボタン ===== */
+.entry-edit-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.1rem 0.65rem;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  color: var(--text-hint);
+  cursor: pointer;
+  transition: all 0.15s;
+  align-items: center;
+}
+.entry-edit-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+
+/* ===== ログインモーダル ===== */
+.login-box {
+  max-width: 340px;
+  padding: 2rem;
+}
+.login-title {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 400;
+  margin-bottom: 1.2rem;
+}
+.login-error {
+  font-size: 0.75rem;
+  color: var(--warn);
+  min-height: 1.2em;
+  margin: 0.4rem 0 0;
+}
+.login-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+.login-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.6rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+.login-cancel:hover { background: var(--bg); }
+
+/* ===== 削除ボタン ===== */
+.compose-delete {
+  background: none;
+  border: 1px solid #DEC0B8;
+  border-radius: var(--radius);
+  padding: 0.65rem 1rem;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--warn);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-right: auto;
+}
+.compose-delete:hover { background: var(--warn-lt); border-color: var(--warn); }
