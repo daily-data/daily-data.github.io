@@ -100,9 +100,10 @@
     </div>
   </div>
 
-  <!-- 投稿パネル -->
+  <!-- 投稿ボタン（常に表示） -->
   <button class="fab" id="fab-btn" title="新しい記事を書く">&#43;</button>
 
+  <!-- 投稿パネル -->
   <div id="compose-overlay" class="compose-overlay" style="display:none">
     <div class="compose-box">
       <div class="compose-header">
@@ -112,8 +113,8 @@
       <div class="compose-fields">
         <input type="text" id="compose-title" class="compose-input" placeholder="タイトル" />
         <div class="compose-row">
-          <input type="date" id="compose-date" class="compose-input compose-date" />
-          <select id="compose-cat" class="compose-input compose-select">
+          <input type="date" id="compose-date" class="compose-input" />
+          <select id="compose-cat" class="compose-input">
             <option value="日記">日記</option>
             <option value="模型">模型</option>
             <option value="サウナ">サウナ</option>
@@ -132,14 +133,10 @@
         </div>
       </div>
       <div class="compose-footer">
-        <p class="compose-hint">記事を書いたら「JSONを生成」→ コピーして <code>entries.json</code> に貼り付けます</p>
-        <button class="compose-generate" id="compose-generate">JSONを生成する</button>
+        <button class="compose-generate" id="compose-generate">投稿する</button>
       </div>
-      <div id="compose-json-out" class="compose-json-out" style="display:none">
-        <p class="json-label">このブロックをコピーして <code>entries.json</code> の配列（<code>[...]</code>の中）に追加してください</p>
-        <pre class="json-pre" id="json-pre"></pre>
-        <button class="copy-btn" id="copy-json-btn">コピーする</button>
-      </div>
+      <!-- JSON出力欄は削除 -->
+      <div id="compose-json-out" style="display:none"></div>
     </div>
   </div>
 
