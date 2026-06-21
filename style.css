@@ -631,23 +631,7 @@ body {
 .compose-footer {
   margin-top: 1rem;
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.compose-hint {
-  font-size: 0.75rem;
-  color: var(--text-hint);
-  line-height: 1.5;
-}
-
-.compose-hint code {
-  font-size: 0.72rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  padding: 0.05rem 0.3rem;
-  color: var(--accent);
+  justify-content: flex-end;
 }
 
 .compose-generate {
