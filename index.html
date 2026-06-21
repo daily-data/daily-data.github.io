@@ -18,14 +18,18 @@
           <h1>日々の記録</h1>
           <p class="site-tagline">模型、サウナ、旅、そして日常</p>
         </div>
-        <nav class="site-nav" id="site-nav">
-          <button class="nav-btn active" data-category="all">すべて</button>
-          <button class="nav-btn" data-category="日記">日記</button>
-          <button class="nav-btn" data-category="模型">模型</button>
-          <button class="nav-btn" data-category="サウナ">サウナ</button>
-          <button class="nav-btn" data-category="旅行">旅行</button>
-          <button class="nav-btn" data-category="その他">その他</button>
-        </nav>
+        <div class="header-right">
+          <nav class="site-nav" id="site-nav">
+            <button class="nav-btn active" data-category="all">すべて</button>
+            <button class="nav-btn" data-category="日記">日記</button>
+            <button class="nav-btn" data-category="模型">模型</button>
+            <button class="nav-btn" data-category="サウナ">サウナ</button>
+            <button class="nav-btn" data-category="旅行">旅行</button>
+            <button class="nav-btn" data-category="その他">その他</button>
+          </nav>
+          <button class="admin-btn" id="admin-login-btn">管理者</button>
+          <button class="admin-btn admin-btn--out" id="admin-logout-btn" style="display:none">ログアウト</button>
+        </div>
       </div>
     </div>
   </header>
@@ -40,7 +44,6 @@
         </section>
 
         <aside class="sidebar">
-
           <div class="widget streak-widget">
             <h2 class="widget-title">連続投稿</h2>
             <div class="streak-display">
@@ -80,8 +83,8 @@
               </div>
             </div>
           </div>
-
         </aside>
+
       </div>
     </div>
   </main>
@@ -100,14 +103,26 @@
     </div>
   </div>
 
-  <!-- 投稿ボタン（常に表示） -->
-  <button class="fab" id="fab-btn" title="新しい記事を書く">&#43;</button>
+  <!-- ログインモーダル -->
+  <div id="login-overlay" class="modal-overlay" style="display:none">
+    <div class="modal-box login-box">
+      <h2 class="login-title">管理者ログイン</h2>
+      <input type="password" id="login-input" class="compose-input" placeholder="パスワード" />
+      <p class="login-error" id="login-error"></p>
+      <div class="login-actions">
+        <button class="login-cancel" id="login-cancel">キャンセル</button>
+        <button class="compose-generate" id="login-submit">ログイン</button>
+      </div>
+    </div>
+  </div>
 
-  <!-- 投稿パネル -->
+  <!-- 投稿・編集パネル -->
+  <button class="fab" id="fab-btn" style="display:none" title="新しい記事を書く">&#43;</button>
+
   <div id="compose-overlay" class="compose-overlay" style="display:none">
     <div class="compose-box">
       <div class="compose-header">
-        <h2 class="compose-heading">新しい記事</h2>
+        <h2 class="compose-heading" id="compose-heading">新しい記事</h2>
         <button class="compose-close" id="compose-close">&times;</button>
       </div>
       <div class="compose-fields">
@@ -133,13 +148,13 @@
         </div>
       </div>
       <div class="compose-footer">
+        <button class="compose-delete" id="compose-delete-btn" style="display:none">削除</button>
         <button class="compose-generate" id="compose-generate">投稿する</button>
       </div>
-      <!-- JSON出力欄は削除 -->
-      <div id="compose-json-out" style="display:none"></div>
     </div>
   </div>
 
+  <div id="compose-json-out" style="display:none"></div>
   <script src="script.js"></script>
 </body>
 </html>
