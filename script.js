@@ -1,7 +1,7 @@
 // ============================================================
 //  設定
 // ============================================================
-const ADMIN_PASSWORD = 'diary2025'; // ← ここを変更
+const ADMIN_PASSWORD = 'data'; // ← ここを変更
 const STORAGE_KEY    = 'blog_entries';
 const AUTH_KEY       = 'blog_admin_authed';
 
