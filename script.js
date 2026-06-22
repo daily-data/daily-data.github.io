@@ -1,7 +1,7 @@
 // ============================================================
 //  設定
 // ============================================================
-const ADMIN_PASSWORD = 'data'; // ← ここを変更
+const ADMIN_PASSWORD = 'diary2025'; // ← ここを変更
 const STORAGE_KEY    = 'blog_entries';
 const AUTH_KEY       = 'blog_admin_authed';
 
@@ -36,26 +36,27 @@ let editingId       = null;
 //  localStorage の投稿とマージする。取れなくてもOK。
 // ============================================================
 async function boot() {
-  let base = [];
-  try {
-    const r = await fetch('entries.json');
-    if (r.ok) base = await r.json();
-  } catch (_) { /* ローカル or ネットワーク不可 → 無視 */ }
-
+  // localStorage が真のデータソース。
+  // entries.json は「初回だけ読む初期サンプル」として扱う。
   const saved = getSaved();
 
-  // base の中で saved に同IDがあれば saved を優先（編集反映）
-  const merged = [];
-  base.forEach(b => {
-    const s = saved.find(x => String(x.id) === String(b.id));
-    merged.push(s || b);
-  });
-  // saved にあって base にないもの（新規投稿）を追加
-  saved.forEach(s => {
-    if (!merged.find(x => String(x.id) === String(s.id))) merged.push(s);
-  });
+  if (saved.length > 0) {
+    // localStorage にデータがある → fetchせずそのまま使う
+    allEntries = saved
+      .filter(e => !e._deleted)
+      .sort((a,b) => b.date.localeCompare(a.date));
+  } else {
+    // 初回：entries.json を読み込み、localStorage に書き込む
+    let base = [];
+    try {
+      const r = await fetch('entries.json');
+      if (r.ok) base = await r.json();
+    } catch (_) { /* ローカル環境など → 空で続行 */ }
 
-  allEntries = merged.sort((a,b) => b.date.localeCompare(a.date));
+    const normalized = base.map(e => ({ ...e, id: String(e.id) }));
+    if (normalized.length > 0) setSaved(normalized);
+    allEntries = normalized.sort((a,b) => b.date.localeCompare(a.date));
+  }
 
   const now = new Date();
   calYear  = now.getFullYear();
