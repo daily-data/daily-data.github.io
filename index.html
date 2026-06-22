@@ -11,6 +11,7 @@
 </head>
 <body>
 
+  <!-- ヘッダー -->
   <header class="site-header">
     <div class="container">
       <div class="header-inner">
@@ -27,22 +28,30 @@
             <button class="nav-btn" data-category="旅行">旅行</button>
             <button class="nav-btn" data-category="その他">その他</button>
           </nav>
-          <button class="admin-btn" id="admin-login-btn">管理者</button>
-          <button class="admin-btn admin-btn--out" id="admin-logout-btn" style="display:none">ログアウト</button>
+          <!-- 鍵アイコンで管理者ログイン -->
+          <button class="lock-btn" id="admin-login-btn" title="管理者ログイン">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </button>
+          <button class="lock-btn lock-btn--active" id="admin-logout-btn" style="display:none" title="ログアウト">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
   </header>
 
+  <!-- メイン -->
   <main class="site-main">
     <div class="container">
       <div class="layout">
-
         <section class="entries-section">
           <div id="entries-list"></div>
           <p id="no-entries" class="no-entries" style="display:none">この条件の記事はまだありません。</p>
         </section>
-
         <aside class="sidebar">
           <div class="widget streak-widget">
             <h2 class="widget-title">連続投稿</h2>
@@ -52,7 +61,6 @@
             </div>
             <p class="streak-sub" id="streak-sub"></p>
           </div>
-
           <div class="widget calendar-widget">
             <div class="calendar-header">
               <button class="cal-nav-btn" id="cal-prev">&#8592;</button>
@@ -65,71 +73,60 @@
               <span class="legend-dot achieved"></span><span>500字達成</span>
             </div>
           </div>
-
           <div class="widget stats-widget">
             <h2 class="widget-title">今月の記録</h2>
             <div class="stats-grid">
-              <div class="stat-item">
-                <span class="stat-num" id="stat-posts">0</span>
-                <span class="stat-lbl">投稿数</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-num" id="stat-achieved">0</span>
-                <span class="stat-lbl">500字達成</span>
-              </div>
-              <div class="stat-item">
-                <span class="stat-num" id="stat-total">0</span>
-                <span class="stat-lbl">総文字数</span>
-              </div>
+              <div class="stat-item"><span class="stat-num" id="stat-posts">0</span><span class="stat-lbl">投稿数</span></div>
+              <div class="stat-item"><span class="stat-num" id="stat-achieved">0</span><span class="stat-lbl">500字達成</span></div>
+              <div class="stat-item"><span class="stat-num" id="stat-total">0</span><span class="stat-lbl">総文字数</span></div>
             </div>
           </div>
         </aside>
-
       </div>
     </div>
   </main>
 
-  <!-- 記事詳細モーダル -->
-  <div id="modal-overlay" class="modal-overlay" style="display:none">
-    <div class="modal-box">
-      <button class="modal-close" id="modal-close">&times;</button>
+  <!-- ① 記事詳細モーダル -->
+  <div id="modal-overlay" class="overlay" style="display:none">
+    <div class="overlay-box">
+      <button class="overlay-close" id="modal-close">&times;</button>
       <div class="modal-meta">
         <span class="modal-date" id="modal-date"></span>
-        <span class="modal-cat" id="modal-cat"></span>
+        <span class="modal-cat"  id="modal-cat"></span>
         <span class="modal-chars" id="modal-chars"></span>
       </div>
       <h2 class="modal-title" id="modal-title"></h2>
-      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-body"  id="modal-body"></div>
     </div>
   </div>
 
-  <!-- ログインモーダル -->
-  <div id="login-overlay" class="modal-overlay" style="display:none">
-    <div class="modal-box login-box">
+  <!-- ② ログインモーダル -->
+  <div id="login-overlay" class="overlay" style="display:none">
+    <div class="overlay-box login-box">
       <h2 class="login-title">管理者ログイン</h2>
-      <input type="password" id="login-input" class="compose-input" placeholder="パスワード" />
+      <input type="password" id="login-input" class="f-input" placeholder="パスワード" autocomplete="current-password" />
       <p class="login-error" id="login-error"></p>
       <div class="login-actions">
-        <button class="login-cancel" id="login-cancel">キャンセル</button>
-        <button class="compose-generate" id="login-submit">ログイン</button>
+        <button class="btn-ghost" id="login-cancel">キャンセル</button>
+        <button class="btn-primary" id="login-submit">ログイン</button>
       </div>
     </div>
   </div>
 
-  <!-- 投稿・編集パネル -->
-  <button class="fab" id="fab-btn" style="display:none" title="新しい記事を書く">&#43;</button>
+  <!-- ③ 投稿・編集パネル -->
+  <button class="fab" id="fab-btn" style="display:none" title="新しい記事">&#43;</button>
 
-  <div id="compose-overlay" class="compose-overlay" style="display:none">
-    <div class="compose-box">
+  <div id="compose-overlay" class="overlay compose-overlay" style="display:none">
+    <div class="overlay-box compose-box">
       <div class="compose-header">
         <h2 class="compose-heading" id="compose-heading">新しい記事</h2>
-        <button class="compose-close" id="compose-close">&times;</button>
+        <button class="overlay-close" id="compose-close">&times;</button>
       </div>
       <div class="compose-fields">
-        <input type="text" id="compose-title" class="compose-input" placeholder="タイトル" />
+        <input type="text"  id="compose-title" class="f-input" placeholder="タイトル" />
         <div class="compose-row">
-          <input type="date" id="compose-date" class="compose-input" />
-          <select id="compose-cat" class="compose-input">
+          <input type="date" id="compose-date" class="f-input" />
+          <select id="compose-cat" class="f-input">
             <option value="日記">日記</option>
             <option value="模型">模型</option>
             <option value="サウナ">サウナ</option>
@@ -138,23 +135,20 @@
           </select>
         </div>
         <div class="textarea-wrap">
-          <textarea id="compose-body" class="compose-textarea" placeholder="今日のこと、書いてみる…" rows="10"></textarea>
+          <textarea id="compose-body" class="f-textarea" placeholder="今日のこと、書いてみる…" rows="10"></textarea>
           <div class="char-bar-wrap">
-            <div class="char-bar-track">
-              <div class="char-bar-fill" id="char-bar-fill"></div>
-            </div>
+            <div class="char-bar-track"><div class="char-bar-fill" id="char-bar-fill"></div></div>
             <span class="char-count" id="char-count">0 / 500</span>
           </div>
         </div>
       </div>
       <div class="compose-footer">
-        <button class="compose-delete" id="compose-delete-btn" style="display:none">削除</button>
-        <button class="compose-generate" id="compose-generate">投稿する</button>
+        <button class="btn-danger" id="compose-delete-btn" style="display:none">削除</button>
+        <button class="btn-primary" id="compose-save-btn">投稿する</button>
       </div>
     </div>
   </div>
 
-  <div id="compose-json-out" style="display:none"></div>
   <script src="script.js"></script>
 </body>
 </html>
