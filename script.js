@@ -1,157 +1,184 @@
-// ===== 管理者パスワード（ここを変更してください） =====
-const ADMIN_PASSWORD = 'data';
+// ============================================================
+//  設定
+// ============================================================
+const ADMIN_PASSWORD = 'diary2025'; // ← ここを変更
+const STORAGE_KEY    = 'blog_entries';
+const AUTH_KEY       = 'blog_admin_authed';
 
-// ===== ストレージ =====
-const STORAGE_KEY   = 'blog_entries';
-const AUTH_KEY      = 'blog_admin_authed';
-
-function getSavedEntries() {
+// ============================================================
+//  ストレージ
+// ============================================================
+function getSaved() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
   catch { return []; }
 }
-function saveEntries(entries) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+function setSaved(arr) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
 }
 function isAuthed() {
   return sessionStorage.getItem(AUTH_KEY) === '1';
 }
-function setAuthed(val) {
-  if (val) sessionStorage.setItem(AUTH_KEY, '1');
-  else sessionStorage.removeItem(AUTH_KEY);
+function setAuthed(v) {
+  v ? sessionStorage.setItem(AUTH_KEY,'1') : sessionStorage.removeItem(AUTH_KEY);
 }
 
-// ===== 状態 =====
+// ============================================================
+//  状態
+// ============================================================
 let allEntries      = [];
 let currentCategory = 'all';
-let calendarYear, calendarMonth;
-let editingId       = null; // 編集中の記事ID（nullなら新規）
+let calYear, calMonth;
+let editingId       = null;
 
-// ===== データ読み込み =====
-async function loadEntries() {
-  let jsonEntries = [];
+// ============================================================
+//  起動：データ読み込み
+//  entries.json が取れればサンプルとして使い、
+//  localStorage の投稿とマージする。取れなくてもOK。
+// ============================================================
+async function boot() {
+  let base = [];
   try {
-    const res = await fetch('entries.json');
-    if (res.ok) jsonEntries = await res.json();
-  } catch (_) {}
+    const r = await fetch('entries.json');
+    if (r.ok) base = await r.json();
+  } catch (_) { /* ローカル or ネットワーク不可 → 無視 */ }
 
-  const saved = getSavedEntries();
-  const merged = [...jsonEntries];
-  saved.forEach(s => {
-    if (!merged.find(e => String(e.id) === String(s.id))) merged.push(s);
+  const saved = getSaved();
+
+  // base の中で saved に同IDがあれば saved を優先（編集反映）
+  const merged = [];
+  base.forEach(b => {
+    const s = saved.find(x => String(x.id) === String(b.id));
+    merged.push(s || b);
   });
-  allEntries = merged.sort((a, b) => b.date.localeCompare(a.date));
+  // saved にあって base にないもの（新規投稿）を追加
+  saved.forEach(s => {
+    if (!merged.find(x => String(x.id) === String(s.id))) merged.push(s);
+  });
 
+  allEntries = merged.sort((a,b) => b.date.localeCompare(a.date));
+
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+
+  render();
+  updateAdminUI();
+}
+
+// ============================================================
+//  まとめて再描画
+// ============================================================
+function render() {
   renderEntries();
   renderCalendar();
   renderStreak();
   renderStats();
-  updateAdminUI();
 }
 
-// ===== 管理者UIの表示切り替え =====
+// ============================================================
+//  管理者UI 切り替え
+// ============================================================
 function updateAdminUI() {
-  const authed = isAuthed();
-  // FABボタン
-  document.getElementById('fab-btn').style.display = authed ? 'flex' : 'none';
-  // ヘッダーのログインボタン
-  document.getElementById('admin-login-btn').style.display  = authed ? 'none'  : 'inline-flex';
-  document.getElementById('admin-logout-btn').style.display = authed ? 'inline-flex' : 'none';
-  // 記事カードの編集ボタン
-  document.querySelectorAll('.entry-edit-btn').forEach(b => {
-    b.style.display = authed ? 'inline-flex' : 'none';
+  const ok = isAuthed();
+  el('fab-btn').style.display         = ok ? 'flex'  : 'none';
+  el('admin-login-btn').style.display = ok ? 'none'  : 'inline-flex';
+  el('admin-logout-btn').style.display= ok ? 'inline-flex' : 'none';
+  document.querySelectorAll('.edit-btn').forEach(b => {
+    b.style.display = ok ? 'inline-flex' : 'none';
   });
 }
 
-// ===== ログイン =====
-document.getElementById('admin-login-btn').addEventListener('click', () => {
-  openLoginModal();
-});
-document.getElementById('admin-logout-btn').addEventListener('click', () => {
+// ============================================================
+//  ログイン
+// ============================================================
+el('admin-login-btn').addEventListener('click', openLogin);
+el('admin-logout-btn').addEventListener('click', () => {
   setAuthed(false);
   updateAdminUI();
-  showToast('ログアウトしました');
+  toast('ログアウトしました');
 });
 
-function openLoginModal() {
-  document.getElementById('login-input').value = '';
-  document.getElementById('login-error').textContent = '';
-  document.getElementById('login-overlay').style.display = 'flex';
-  setTimeout(() => document.getElementById('login-input').focus(), 80);
+function openLogin() {
+  el('login-input').value = '';
+  el('login-error').textContent = '';
+  show('login-overlay');
+  setTimeout(() => el('login-input').focus(), 80);
 }
 
-document.getElementById('login-submit').addEventListener('click', doLogin);
-document.getElementById('login-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+el('login-cancel').addEventListener('click', () => hide('login-overlay'));
+el('login-overlay').addEventListener('click', e => {
+  if (e.target === el('login-overlay')) hide('login-overlay');
 });
-document.getElementById('login-cancel').addEventListener('click', () => {
-  document.getElementById('login-overlay').style.display = 'none';
-});
+el('login-submit').addEventListener('click', doLogin);
+el('login-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
 function doLogin() {
-  const val = document.getElementById('login-input').value;
-  if (val === ADMIN_PASSWORD) {
+  if (el('login-input').value === ADMIN_PASSWORD) {
     setAuthed(true);
-    document.getElementById('login-overlay').style.display = 'none';
+    hide('login-overlay');
     updateAdminUI();
-    showToast('ログインしました');
+    toast('ログインしました');
   } else {
-    document.getElementById('login-error').textContent = 'パスワードが違います';
-    document.getElementById('login-input').value = '';
-    document.getElementById('login-input').focus();
+    el('login-error').textContent = 'パスワードが違います';
+    el('login-input').value = '';
+    el('login-input').focus();
   }
 }
 
-// ===== 記事一覧 =====
+// ============================================================
+//  記事一覧
+// ============================================================
 function renderEntries() {
-  const list  = document.getElementById('entries-list');
-  const noMsg = document.getElementById('no-entries');
-  const authed = isAuthed();
+  const list = el('entries-list');
+  const none = el('no-entries');
+  const ok   = isAuthed();
 
   const filtered = currentCategory === 'all'
     ? allEntries
     : allEntries.filter(e => e.category === currentCategory);
 
-  if (filtered.length === 0) {
+  if (!filtered.length) {
     list.innerHTML = '';
-    noMsg.style.display = 'block';
+    none.style.display = 'block';
     return;
   }
-  noMsg.style.display = 'none';
+  none.style.display = 'none';
 
-  list.innerHTML = filtered.map(entry => {
-    const chars = (entry.body || '').replace(/\s/g, '').length;
-    const pct   = Math.min(100, Math.round(chars / 500 * 100));
-    const achieved = chars >= 500 ? '<span class="achieved-badge">500字達成</span>' : '';
-    const excerpt  = (entry.body || '').slice(0, 80).replace(/\n/g, ' ');
+  list.innerHTML = filtered.map(e => {
+    const chars   = countChars(e.body);
+    const pct     = Math.min(100, chars/500*100);
+    const achHTML = chars >= 500 ? '<span class="achieved-badge">500字達成</span>' : '';
+    const excerpt = (e.body||'').slice(0,80).replace(/\n/g,' ');
+    const editBtn = `<button class="edit-btn" data-id="${e.id}" style="display:${ok?'inline-flex':'none'}">編集</button>`;
 
-    return `<article class="entry-card" data-id="${entry.id}">
+    return `<article class="entry-card" data-id="${e.id}">
   <div class="entry-meta">
-    <span class="entry-date">${formatDate(entry.date)}</span>
-    <span class="cat-badge">${escHtml(entry.category)}</span>
-    ${achieved}
-    <button class="entry-edit-btn" data-id="${entry.id}" style="display:${authed?'inline-flex':'none'}" title="編集">編集</button>
+    <span class="entry-date">${fmtDate(e.date)}</span>
+    <span class="cat-badge">${esc(e.category)}</span>
+    ${achHTML}
+    ${editBtn}
   </div>
-  <h2 class="entry-title">${escHtml(entry.title)}</h2>
-  <p class="entry-excerpt">${escHtml(excerpt)}${(entry.body||'').length > 80 ? '…' : ''}</p>
+  <h2 class="entry-title">${esc(e.title)}</h2>
+  <p class="entry-excerpt">${esc(excerpt)}${(e.body||'').length>80?'…':''}</p>
   <div class="entry-footer">
     <div class="char-mini-bar">
-      <div class="char-mini-fill${chars >= 500 ? ' over' : ''}" style="width:${pct}%"></div>
+      <div class="char-mini-fill${chars>=500?' over':''}" style="width:${pct}%"></div>
     </div>
     <span class="entry-chars">${chars.toLocaleString()} 字</span>
   </div>
 </article>`;
   }).join('');
 
-  // 記事クリック → モーダル（編集ボタンのクリックは除外）
+  // カード本体クリック → 詳細
   list.querySelectorAll('.entry-card').forEach(card => {
     card.addEventListener('click', e => {
-      if (e.target.closest('.entry-edit-btn')) return;
-      openModal(card.dataset.id);
+      if (e.target.closest('.edit-btn')) return;
+      openDetail(card.dataset.id);
     });
   });
 
   // 編集ボタン
-  list.querySelectorAll('.entry-edit-btn').forEach(btn => {
+  list.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       openCompose(btn.dataset.id);
@@ -159,8 +186,10 @@ function renderEntries() {
   });
 }
 
-// ===== カテゴリフィルター =====
-document.getElementById('site-nav').addEventListener('click', e => {
+// ============================================================
+//  カテゴリ
+// ============================================================
+el('site-nav').addEventListener('click', e => {
   const btn = e.target.closest('.nav-btn');
   if (!btn) return;
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -169,281 +198,272 @@ document.getElementById('site-nav').addEventListener('click', e => {
   renderEntries();
 });
 
-// ===== モーダル（閲覧） =====
-function openModal(id) {
-  const entry = allEntries.find(e => String(e.id) === String(id));
-  if (!entry) return;
-  const chars = (entry.body || '').replace(/\s/g, '').length;
-  document.getElementById('modal-date').textContent  = formatDate(entry.date);
-  document.getElementById('modal-cat').textContent   = entry.category;
-  document.getElementById('modal-chars').textContent = chars.toLocaleString() + ' 字';
-  document.getElementById('modal-title').textContent = entry.title;
-  document.getElementById('modal-body').textContent  = entry.body || '';
-  document.getElementById('modal-overlay').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
+// ============================================================
+//  詳細モーダル
+// ============================================================
+function openDetail(id) {
+  const e = allEntries.find(x => String(x.id)===String(id));
+  if (!e) return;
+  const chars = countChars(e.body);
+  el('modal-date').textContent  = fmtDate(e.date);
+  el('modal-cat').textContent   = e.category;
+  el('modal-chars').textContent = chars.toLocaleString()+' 字';
+  el('modal-title').textContent = e.title;
+  el('modal-body').textContent  = e.body||'';
+  show('modal-overlay');
 }
-
-document.getElementById('modal-close').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeModal();
+el('modal-close').addEventListener('click', () => hide('modal-overlay'));
+el('modal-overlay').addEventListener('click', e => {
+  if (e.target===el('modal-overlay')) hide('modal-overlay');
 });
-function closeModal() {
-  document.getElementById('modal-overlay').style.display = 'none';
-  document.body.style.overflow = '';
-}
 
-// ===== 投稿・編集パネル =====
-const fab            = document.getElementById('fab-btn');
-const composeOverlay = document.getElementById('compose-overlay');
-
-fab.addEventListener('click', () => openCompose(null));
-document.getElementById('compose-close').addEventListener('click', closeCompose);
-composeOverlay.addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeCompose();
+// ============================================================
+//  投稿・編集パネル
+// ============================================================
+el('fab-btn').addEventListener('click', () => openCompose(null));
+el('compose-close').addEventListener('click', closeCompose);
+el('compose-overlay').addEventListener('click', e => {
+  if (e.target===el('compose-overlay')) closeCompose();
 });
 
 function openCompose(id) {
-  if (!isAuthed()) { openLoginModal(); return; }
+  if (!isAuthed()) { openLogin(); return; }
 
   editingId = id ? String(id) : null;
-  const isEdit = editingId !== null;
+  const isEdit = !!editingId;
 
-  document.getElementById('compose-heading').textContent = isEdit ? '記事を編集' : '新しい記事';
-  document.getElementById('compose-delete-btn').style.display = isEdit ? 'inline-flex' : 'none';
+  el('compose-heading').textContent = isEdit ? '記事を編集' : '新しい記事';
+  el('compose-save-btn').textContent = isEdit ? '更新する' : '投稿する';
+  el('compose-delete-btn').style.display = isEdit ? 'inline-flex' : 'none';
 
   if (isEdit) {
-    const entry = allEntries.find(e => String(e.id) === editingId);
-    if (!entry) return;
-    document.getElementById('compose-title').value = entry.title;
-    document.getElementById('compose-date').value  = entry.date;
-    document.getElementById('compose-cat').value   = entry.category;
-    document.getElementById('compose-body').value  = entry.body || '';
+    const e = allEntries.find(x => String(x.id)===editingId);
+    if (!e) return;
+    el('compose-title').value = e.title  || '';
+    el('compose-date').value  = e.date   || '';
+    el('compose-cat').value   = e.category || '日記';
+    el('compose-body').value  = e.body   || '';
   } else {
-    document.getElementById('compose-title').value = '';
-    document.getElementById('compose-date').value  = toDateStr(new Date());
-    document.getElementById('compose-cat').value   = '日記';
-    document.getElementById('compose-body').value  = '';
+    el('compose-title').value = '';
+    el('compose-date').value  = dateStr(new Date());
+    el('compose-cat').value   = '日記';
+    el('compose-body').value  = '';
   }
 
   updateCharCount();
-  composeOverlay.style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-  setTimeout(() => document.getElementById('compose-title').focus(), 80);
+  show('compose-overlay');
+  setTimeout(() => el('compose-title').focus(), 80);
 }
 
 function closeCompose() {
-  composeOverlay.style.display = 'none';
-  document.body.style.overflow = '';
+  hide('compose-overlay');
   editingId = null;
 }
 
-// 文字数カウント
-document.getElementById('compose-body').addEventListener('input', updateCharCount);
-
+// 文字数
+el('compose-body').addEventListener('input', updateCharCount);
 function updateCharCount() {
-  const count = document.getElementById('compose-body').value.replace(/\s/g, '').length;
-  const pct   = Math.min(100, count / 500 * 100);
-  const fill  = document.getElementById('char-bar-fill');
-  const label = document.getElementById('char-count');
-
-  fill.style.width = pct + '%';
-  fill.className   = 'char-bar-fill';
-  label.className  = 'char-count';
-
-  if (count >= 500) {
-    fill.classList.add('done');
-    label.classList.add('done');
-    label.textContent = `${count.toLocaleString()} / 500 ✓`;
-  } else if (pct >= 80) {
-    fill.classList.add('near');
-    label.textContent = `${count.toLocaleString()} / 500`;
-  } else {
-    label.textContent = `${count.toLocaleString()} / 500`;
-  }
+  const count = countChars(el('compose-body').value);
+  const pct   = Math.min(100, count/500*100);
+  const fill  = el('char-bar-fill');
+  const lbl   = el('char-count');
+  fill.style.width = pct+'%';
+  fill.className   = 'char-bar-fill'+(count>=500?' done':pct>=80?' near':'');
+  lbl.className    = 'char-count'+(count>=500?' done':'');
+  lbl.textContent  = count>=500
+    ? `${count.toLocaleString()} / 500 ✓`
+    : `${count.toLocaleString()} / 500`;
 }
 
-// 投稿・更新
-document.getElementById('compose-generate').addEventListener('click', () => {
-  const title = document.getElementById('compose-title').value.trim();
-  const date  = document.getElementById('compose-date').value;
-  const cat   = document.getElementById('compose-cat').value;
-  const body  = document.getElementById('compose-body').value.trim();
+// 保存（投稿 or 更新）
+el('compose-save-btn').addEventListener('click', () => {
+  const title = el('compose-title').value.trim();
+  const date  = el('compose-date').value;
+  const cat   = el('compose-cat').value;
+  const body  = el('compose-body').value.trim();
 
   if (!title || !date || !body) {
     alert('タイトル・日付・本文をすべて入力してください');
     return;
   }
 
-  const saved = getSavedEntries();
+  const saved = getSaved();
 
   if (editingId) {
-    // 既存記事を更新
-    const idx = saved.findIndex(e => String(e.id) === editingId);
-    const updated = { id: Number(editingId) || editingId, date, category: cat, title, body };
-    if (idx >= 0) {
-      saved[idx] = updated;
-    } else {
-      // entries.json 由来のものを saved に追加
-      saved.push(updated);
-    }
-    saveEntries(saved);
+    // 更新
+    const updated = { id: editingId, date, category: cat, title, body };
+    const si = saved.findIndex(x => String(x.id)===editingId);
+    if (si >= 0) saved[si] = updated;
+    else saved.push(updated);   // entries.json 由来の記事を初めて編集する場合
+    setSaved(saved);
 
-    const ai = allEntries.findIndex(e => String(e.id) === editingId);
+    const ai = allEntries.findIndex(x => String(x.id)===editingId);
     if (ai >= 0) allEntries[ai] = updated;
-    showToast('記事を更新しました');
+    toast('記事を更新しました');
   } else {
-    // 新規投稿
-    const newEntry = { id: Date.now(), date, category: cat, title, body };
-    saved.push(newEntry);
-    saveEntries(saved);
-    allEntries.unshift(newEntry);
-    showToast('投稿しました！');
+    // 新規
+    const entry = { id: String(Date.now()), date, category: cat, title, body };
+    saved.push(entry);
+    setSaved(saved);
+    allEntries.push(entry);
+    toast('投稿しました！');
   }
 
-  allEntries.sort((a, b) => b.date.localeCompare(a.date));
-  renderEntries();
-  renderCalendar();
-  renderStreak();
-  renderStats();
+  allEntries.sort((a,b) => b.date.localeCompare(a.date));
   closeCompose();
+  render();
 });
 
 // 削除
-document.getElementById('compose-delete-btn').addEventListener('click', () => {
+el('compose-delete-btn').addEventListener('click', () => {
   if (!editingId) return;
-  const entry = allEntries.find(e => String(e.id) === editingId);
-  const label = entry ? `「${entry.title}」` : 'この記事';
-  if (!confirm(`${label} を削除しますか？`)) return;
+  const e = allEntries.find(x => String(x.id)===editingId);
+  if (!confirm(`「${e?.title||'この記事'}」を削除しますか？`)) return;
 
-  const saved = getSavedEntries().filter(e => String(e.id) !== editingId);
-  saveEntries(saved);
-  allEntries = allEntries.filter(e => String(e.id) !== editingId);
+  const saved = getSaved().filter(x => String(x.id)!==editingId);
+  setSaved(saved);
 
-  renderEntries();
-  renderCalendar();
-  renderStreak();
-  renderStats();
+  // entries.json 由来の記事を「削除」する場合は
+  // 空ボディでもう一度 saved に入れて上書き（表示から消す）
+  const fromBase = !getSaved().find(x=>String(x.id)===editingId);
+  if (fromBase) {
+    // entries.json にあるものは削除フラグ方式
+    const del = getSaved();
+    del.push({ id: editingId, _deleted: true });
+    setSaved(del);
+  }
+
+  allEntries = allEntries.filter(x => String(x.id)!==editingId);
   closeCompose();
-  showToast('記事を削除しました');
+  render();
+  toast('削除しました');
 });
 
-// ===== カレンダー =====
-function initCalendar() {
-  const now = new Date();
-  calendarYear  = now.getFullYear();
-  calendarMonth = now.getMonth();
-}
-
+// ============================================================
+//  カレンダー
+// ============================================================
 function renderCalendar() {
-  const title = document.getElementById('calendar-title');
-  const grid  = document.getElementById('calendar-grid');
-  title.textContent = `${calendarYear}年 ${calendarMonth + 1}月`;
+  el('calendar-title').textContent = `${calYear}年 ${calMonth+1}月`;
 
-  const postMap = {};
+  const map = {};
   allEntries.forEach(e => {
     if (!e.date) return;
-    const [y, m] = e.date.split('-').map(Number);
-    if (y === calendarYear && m === calendarMonth + 1) {
-      const chars = (e.body || '').replace(/\s/g, '').length;
-      postMap[e.date] = { achieved: chars >= 500 };
-    }
+    const [y,m] = e.date.split('-').map(Number);
+    if (y===calYear && m===calMonth+1)
+      map[e.date] = countChars(e.body) >= 500;
   });
 
-  const todayStr  = toDateStr(new Date());
-  const firstDay  = new Date(calendarYear, calendarMonth, 1).getDay();
-  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const today    = dateStr(new Date());
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const days     = new Date(calYear, calMonth+1, 0).getDate();
 
   let html = ['日','月','火','水','木','金','土']
-    .map(d => `<div class="cal-day-header">${d}</div>`).join('');
-  for (let i = 0; i < firstDay; i++) html += '<div class="cal-day other-month"></div>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const ds  = `${calendarYear}-${String(calendarMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const info = postMap[ds];
+    .map(d=>`<div class="cal-day-header">${d}</div>`).join('');
+  for (let i=0;i<firstDay;i++) html+='<div class="cal-day other-month"></div>';
+  for (let d=1;d<=days;d++) {
+    const ds = `${calYear}-${pad(calMonth+1)}-${pad(d)}`;
     let cls = 'cal-day';
-    if (info) cls += info.achieved ? ' achieved' : ' has-post';
-    if (ds === todayStr) cls += ' today';
-    html += `<div class="${cls}">${d}</div>`;
+    if (ds in map) cls += map[ds]?' achieved':' has-post';
+    if (ds===today) cls+=' today';
+    html+=`<div class="${cls}">${d}</div>`;
   }
-  grid.innerHTML = html;
+  el('calendar-grid').innerHTML = html;
 }
 
-document.getElementById('cal-prev').addEventListener('click', () => {
-  if (--calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
-  renderCalendar();
-});
-document.getElementById('cal-next').addEventListener('click', () => {
-  if (++calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
-  renderCalendar();
-});
+el('cal-prev').addEventListener('click',()=>{ if(--calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
+el('cal-next').addEventListener('click',()=>{ if(++calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
 
-// ===== ストリーク =====
+// ============================================================
+//  ストリーク
+// ============================================================
 function renderStreak() {
-  const dates = [...new Set(allEntries.map(e => e.date))].sort().reverse();
-  let streak = 0;
-  const check = new Date();
-  check.setHours(0,0,0,0);
-  for (let i = 0; i < 365; i++) {
-    const str = toDateStr(check);
-    if (dates.includes(str)) {
-      streak++;
-      check.setDate(check.getDate() - 1);
-    } else if (i === 0) {
-      check.setDate(check.getDate() - 1);
-      if (!dates.includes(toDateStr(check))) break;
-    } else break;
+  const dates = [...new Set(allEntries.map(e=>e.date))].sort().reverse();
+  let streak=0;
+  const cur = new Date(); cur.setHours(0,0,0,0);
+  for (let i=0;i<365;i++) {
+    const s = dateStr(cur);
+    if (dates.includes(s)) { streak++; cur.setDate(cur.getDate()-1); }
+    else if (i===0) { cur.setDate(cur.getDate()-1); if(!dates.includes(dateStr(cur))) break; }
+    else break;
   }
-  document.getElementById('streak-count').textContent = streak;
-  const sub = document.getElementById('streak-sub');
-  if      (streak === 0)  sub.textContent = 'まず1日書いてみよう';
-  else if (streak < 3)    sub.textContent = 'いいスタート！続けよう';
-  else if (streak < 7)    sub.textContent = `${streak}日目。調子いい！`;
-  else if (streak < 30)   sub.textContent = `${streak}日連続。素晴らしい！`;
-  else                    sub.textContent = `${streak}日連続。圧巻の継続力！`;
+  el('streak-count').textContent = streak;
+  el('streak-sub').textContent =
+    streak===0 ? 'まず1日書いてみよう' :
+    streak<3   ? 'いいスタート！' :
+    streak<7   ? `${streak}日目、好調！` :
+    streak<30  ? `${streak}日連続、素晴らしい！` :
+                 `${streak}日連続、圧巻！`;
 }
 
-// ===== 統計 =====
+// ============================================================
+//  統計
+// ============================================================
 function renderStats() {
   const now = new Date();
-  const y = now.getFullYear(), m = now.getMonth() + 1;
-  const thisMonth = allEntries.filter(e => {
-    const [ey, em] = (e.date||'').split('-').map(Number);
-    return ey === y && em === m;
+  const y=now.getFullYear(), m=now.getMonth()+1;
+  const cur = allEntries.filter(e=>{
+    const [ey,em]=((e.date||'').split('-')).map(Number);
+    return ey===y&&em===m;
   });
-  const achieved = thisMonth.filter(e => (e.body||'').replace(/\s/g,'').length >= 500);
-  const total    = thisMonth.reduce((s, e) => s + (e.body||'').replace(/\s/g,'').length, 0);
-  document.getElementById('stat-posts').textContent    = thisMonth.length;
-  document.getElementById('stat-achieved').textContent = achieved.length;
-  document.getElementById('stat-total').textContent    = total >= 1000 ? (total/1000).toFixed(1)+'k' : total;
+  const ach   = cur.filter(e=>countChars(e.body)>=500).length;
+  const total = cur.reduce((s,e)=>s+countChars(e.body),0);
+  el('stat-posts').textContent    = cur.length;
+  el('stat-achieved').textContent = ach;
+  el('stat-total').textContent    = total>=1000?(total/1000).toFixed(1)+'k':total;
 }
 
-// ===== トースト =====
-function showToast(msg) {
-  let t = document.getElementById('toast');
+// ============================================================
+//  トースト
+// ============================================================
+function toast(msg) {
+  let t = document.getElementById('_toast');
   if (!t) {
     t = document.createElement('div');
-    t.id = 'toast';
-    t.style.cssText = 'position:fixed;bottom:5rem;left:50%;transform:translateX(-50%);background:#2A6049;color:#fff;font-size:0.82rem;padding:0.55rem 1.2rem;border-radius:20px;z-index:400;pointer-events:none;opacity:0;transition:opacity 0.2s';
+    t.id = '_toast';
+    Object.assign(t.style, {
+      position:'fixed', bottom:'5rem', left:'50%', transform:'translateX(-50%)',
+      background:'#2A6049', color:'#fff', fontSize:'0.82rem',
+      padding:'0.55rem 1.2rem', borderRadius:'20px', zIndex:'9999',
+      pointerEvents:'none', opacity:'0', transition:'opacity 0.2s',
+      whiteSpace:'nowrap'
+    });
     document.body.appendChild(t);
   }
   t.textContent = msg;
   t.style.opacity = '1';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.style.opacity = '0', 2200);
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.style.opacity='0', 2200);
 }
 
-// ===== ユーティリティ =====
-function toDateStr(d) {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+// ============================================================
+//  ユーティリティ
+// ============================================================
+function el(id) { return document.getElementById(id); }
+function show(id) {
+  el(id).style.display = 'flex';
+  document.body.style.overflow = 'hidden';
 }
-function formatDate(str) {
-  if (!str) return '';
-  const [y, m, d] = str.split('-');
+function hide(id) {
+  el(id).style.display = 'none';
+  document.body.style.overflow = '';
+}
+function countChars(s) { return (s||'').replace(/\s/g,'').length; }
+function dateStr(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+function fmtDate(s) {
+  if(!s) return '';
+  const [y,m,d]=s.split('-');
   return `${y}年${Number(m)}月${Number(d)}日`;
 }
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ===== 起動 =====
-initCalendar();
-loadEntries();
+// ============================================================
+//  起動
+// ============================================================
+boot();
