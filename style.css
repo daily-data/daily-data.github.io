@@ -304,3 +304,17 @@ body {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .fab:hover { transform: scale(1.06); box-shadow: 0 6px 20px rgba(42,96,73,0.4); }
+
+/* ===== ログイン追加スタイル ===== */
+.login-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--sub);
+  margin-bottom: 0.3rem;
+}
+.login-hint {
+  font-size: 0.68rem;
+  color: var(--hint);
+  margin-top: 0.3rem;
+  line-height: 1.5;
+}
