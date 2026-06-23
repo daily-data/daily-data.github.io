@@ -104,7 +104,11 @@
   <div id="login-overlay" class="overlay" style="display:none">
     <div class="overlay-box login-box">
       <h2 class="login-title">管理者ログイン</h2>
-      <input type="password" id="login-input" class="f-input" placeholder="パスワード" autocomplete="current-password" />
+      <label class="login-label">パスワード</label>
+      <input type="password" id="login-pass" class="f-input" placeholder="管理者パスワード" autocomplete="current-password" />
+      <label class="login-label" style="margin-top:0.75rem">GitHub Personal Access Token</label>
+      <input type="password" id="login-pat" class="f-input" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" />
+      <p class="login-hint">初回のみ必要です。以降はセッション中保持されます。</p>
       <p class="login-error" id="login-error"></p>
       <div class="login-actions">
         <button class="btn-ghost" id="login-cancel">キャンセル</button>
