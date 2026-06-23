@@ -1,26 +1,28 @@
 // ============================================================
-//  設定
+//  ★ 設定（ここだけ書き換えてください）
 // ============================================================
-const ADMIN_PASSWORD = 'diary2025'; // ← ここを変更
-const STORAGE_KEY    = 'blog_entries';
-const AUTH_KEY       = 'blog_admin_authed';
+const ADMIN_PASSWORD = 'data';       // 管理者パスワード
+const GITHUB_OWNER   = 'daily-data';   // GitHubユーザー名
+const GITHUB_REPO    = 'daily-data.github.io'; // リポジトリ名
+const GITHUB_FILE    = 'entries.json';    // 記事ファイルのパス
+// PATはログイン後に管理者設定画面から入力します（コードに書かない）
+
+// ============================================================
+//  内部定数
+// ============================================================
+const AUTH_KEY    = 'blog_admin_authed';
+const PAT_KEY     = 'blog_github_pat';
+const CACHE_KEY   = 'blog_entries_cache';
 
 // ============================================================
 //  ストレージ
 // ============================================================
-function getSaved() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
-  catch { return []; }
-}
-function setSaved(arr) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
-}
-function isAuthed() {
-  return sessionStorage.getItem(AUTH_KEY) === '1';
-}
-function setAuthed(v) {
-  v ? sessionStorage.setItem(AUTH_KEY,'1') : sessionStorage.removeItem(AUTH_KEY);
-}
+function getPAT()        { return sessionStorage.getItem(PAT_KEY) || ''; }
+function setPAT(v)       { sessionStorage.setItem(PAT_KEY, v); }
+function isAuthed()      { return sessionStorage.getItem(AUTH_KEY) === '1'; }
+function setAuthed(v)    { v ? sessionStorage.setItem(AUTH_KEY,'1') : sessionStorage.removeItem(AUTH_KEY); }
+function getCache()      { try { return JSON.parse(localStorage.getItem(CACHE_KEY)||'null'); } catch{return null;} }
+function setCache(data)  { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); }
 
 // ============================================================
 //  状態
@@ -29,51 +31,88 @@ let allEntries      = [];
 let currentCategory = 'all';
 let calYear, calMonth;
 let editingId       = null;
+let currentSha      = '';   // entries.json の現在のSHA（更新に必要）
 
 // ============================================================
-//  起動：データ読み込み
-//  entries.json が取れればサンプルとして使い、
-//  localStorage の投稿とマージする。取れなくてもOK。
+//  GitHub API
+// ============================================================
+const API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
+
+async function fetchFromGitHub() {
+  const res = await fetch(API, {
+    headers: {
+      'Authorization': `token ${getPAT()}`,
+      'Accept': 'application/vnd.github.v3+json'
+    }
+  });
+  if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
+  const data = await res.json();
+  currentSha = data.sha;
+  const json = JSON.parse(atob(data.content.replace(/\n/g,'')));
+  return json;
+}
+
+async function saveToGitHub(entries) {
+  const content = btoa(unescape(encodeURIComponent(
+    JSON.stringify(entries, null, 2)
+  )));
+  const body = {
+    message: `記事を更新 ${new Date().toLocaleDateString('ja-JP')}`,
+    content,
+    sha: currentSha
+  };
+  const res = await fetch(API, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `token ${getPAT()}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || `GitHub API error: ${res.status}`);
+  }
+  const result = await res.json();
+  currentSha = result.content.sha; // 更新後のSHAを保持
+  return result;
+}
+
+// ============================================================
+//  起動
 // ============================================================
 async function boot() {
-  // localStorage が真のデータソース。
-  // entries.json は「初回だけ読む初期サンプル」として扱う。
-  const saved = getSaved();
-
-  if (saved.length > 0) {
-    // localStorage にデータがある → fetchせずそのまま使う
-    allEntries = saved
-      .filter(e => !e._deleted)
-      .sort((a,b) => b.date.localeCompare(a.date));
-  } else {
-    // 初回：entries.json を読み込み、localStorage に書き込む
-    let base = [];
-    try {
-      const r = await fetch('entries.json');
-      if (r.ok) base = await r.json();
-    } catch (_) { /* ローカル環境など → 空で続行 */ }
-
-    const normalized = base.map(e => ({ ...e, id: String(e.id) }));
-    if (normalized.length > 0) setSaved(normalized);
-    allEntries = normalized.sort((a,b) => b.date.localeCompare(a.date));
-  }
-
   const now = new Date();
   calYear  = now.getFullYear();
   calMonth = now.getMonth();
 
-  render();
+  // キャッシュがあれば先に表示（表示を速くする）
+  const cache = getCache();
+  if (cache) {
+    allEntries = cache.entries || [];
+    currentSha = cache.sha    || '';
+    render();
+  }
+
+  // PATがあればGitHubから最新を取得
+  if (getPAT()) {
+    await refreshFromGitHub();
+  }
+
   updateAdminUI();
 }
 
-// ============================================================
-//  まとめて再描画
-// ============================================================
-function render() {
-  renderEntries();
-  renderCalendar();
-  renderStreak();
-  renderStats();
+async function refreshFromGitHub() {
+  try {
+    const entries = await fetchFromGitHub();
+    allEntries = entries.sort((a,b) => b.date.localeCompare(a.date));
+    setCache({ entries: allEntries, sha: currentSha });
+    render();
+  } catch (e) {
+    console.warn('GitHub fetch failed:', e.message);
+    // キャッシュのまま続行（オフラインでも閲覧可）
+  }
 }
 
 // ============================================================
@@ -81,9 +120,9 @@ function render() {
 // ============================================================
 function updateAdminUI() {
   const ok = isAuthed();
-  el('fab-btn').style.display         = ok ? 'flex'  : 'none';
-  el('admin-login-btn').style.display = ok ? 'none'  : 'inline-flex';
-  el('admin-logout-btn').style.display= ok ? 'inline-flex' : 'none';
+  el('fab-btn').style.display          = ok ? 'flex'        : 'none';
+  el('admin-login-btn').style.display  = ok ? 'none'        : 'inline-flex';
+  el('admin-logout-btn').style.display = ok ? 'inline-flex' : 'none';
   document.querySelectorAll('.edit-btn').forEach(b => {
     b.style.display = ok ? 'inline-flex' : 'none';
   });
@@ -95,15 +134,17 @@ function updateAdminUI() {
 el('admin-login-btn').addEventListener('click', openLogin);
 el('admin-logout-btn').addEventListener('click', () => {
   setAuthed(false);
+  setPAT('');
   updateAdminUI();
   toast('ログアウトしました');
 });
 
 function openLogin() {
-  el('login-input').value = '';
+  el('login-pass').value = '';
+  el('login-pat').value  = getPAT(); // 再ログイン時はPATを保持
   el('login-error').textContent = '';
   show('login-overlay');
-  setTimeout(() => el('login-input').focus(), 80);
+  setTimeout(() => el('login-pass').focus(), 80);
 }
 
 el('login-cancel').addEventListener('click', () => hide('login-overlay'));
@@ -111,18 +152,39 @@ el('login-overlay').addEventListener('click', e => {
   if (e.target === el('login-overlay')) hide('login-overlay');
 });
 el('login-submit').addEventListener('click', doLogin);
-el('login-input').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+el('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') el('login-pat').focus(); });
+el('login-pat').addEventListener('keydown',  e => { if(e.key==='Enter') doLogin(); });
 
-function doLogin() {
-  if (el('login-input').value === ADMIN_PASSWORD) {
+async function doLogin() {
+  if (el('login-pass').value !== ADMIN_PASSWORD) {
+    el('login-error').textContent = 'パスワードが違います';
+    el('login-pass').value = '';
+    el('login-pass').focus();
+    return;
+  }
+  const pat = el('login-pat').value.trim();
+  if (!pat) {
+    el('login-error').textContent = 'GitHub Personal Access Tokenを入力してください';
+    el('login-pat').focus();
+    return;
+  }
+
+  // PATの疎通確認
+  el('login-submit').textContent = '確認中…';
+  el('login-submit').disabled    = true;
+  try {
+    setPAT(pat);
+    await refreshFromGitHub();
     setAuthed(true);
     hide('login-overlay');
     updateAdminUI();
     toast('ログインしました');
-  } else {
-    el('login-error').textContent = 'パスワードが違います';
-    el('login-input').value = '';
-    el('login-input').focus();
+  } catch(e) {
+    el('login-error').textContent = 'Token が無効か、リポジトリ設定が間違っています';
+    setPAT('');
+  } finally {
+    el('login-submit').textContent = 'ログイン';
+    el('login-submit').disabled    = false;
   }
 }
 
@@ -151,13 +213,11 @@ function renderEntries() {
     const achHTML = chars >= 500 ? '<span class="achieved-badge">500字達成</span>' : '';
     const excerpt = (e.body||'').slice(0,80).replace(/\n/g,' ');
     const editBtn = `<button class="edit-btn" data-id="${e.id}" style="display:${ok?'inline-flex':'none'}">編集</button>`;
-
     return `<article class="entry-card" data-id="${e.id}">
   <div class="entry-meta">
     <span class="entry-date">${fmtDate(e.date)}</span>
     <span class="cat-badge">${esc(e.category)}</span>
-    ${achHTML}
-    ${editBtn}
+    ${achHTML}${editBtn}
   </div>
   <h2 class="entry-title">${esc(e.title)}</h2>
   <p class="entry-excerpt">${esc(excerpt)}${(e.body||'').length>80?'…':''}</p>
@@ -170,15 +230,12 @@ function renderEntries() {
 </article>`;
   }).join('');
 
-  // カード本体クリック → 詳細
   list.querySelectorAll('.entry-card').forEach(card => {
     card.addEventListener('click', e => {
       if (e.target.closest('.edit-btn')) return;
       openDetail(card.dataset.id);
     });
   });
-
-  // 編集ボタン
   list.querySelectorAll('.edit-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
@@ -229,28 +286,25 @@ el('compose-overlay').addEventListener('click', e => {
 
 function openCompose(id) {
   if (!isAuthed()) { openLogin(); return; }
-
   editingId = id ? String(id) : null;
   const isEdit = !!editingId;
-
-  el('compose-heading').textContent = isEdit ? '記事を編集' : '新しい記事';
-  el('compose-save-btn').textContent = isEdit ? '更新する' : '投稿する';
+  el('compose-heading').textContent    = isEdit ? '記事を編集' : '新しい記事';
+  el('compose-save-btn').textContent   = isEdit ? '更新する'   : '投稿する';
   el('compose-delete-btn').style.display = isEdit ? 'inline-flex' : 'none';
 
   if (isEdit) {
     const e = allEntries.find(x => String(x.id)===editingId);
     if (!e) return;
-    el('compose-title').value = e.title  || '';
-    el('compose-date').value  = e.date   || '';
+    el('compose-title').value = e.title    || '';
+    el('compose-date').value  = e.date     || '';
     el('compose-cat').value   = e.category || '日記';
-    el('compose-body').value  = e.body   || '';
+    el('compose-body').value  = e.body     || '';
   } else {
     el('compose-title').value = '';
     el('compose-date').value  = dateStr(new Date());
     el('compose-cat').value   = '日記';
     el('compose-body').value  = '';
   }
-
   updateCharCount();
   show('compose-overlay');
   setTimeout(() => el('compose-title').focus(), 80);
@@ -261,7 +315,6 @@ function closeCompose() {
   editingId = null;
 }
 
-// 文字数
 el('compose-body').addEventListener('input', updateCharCount);
 function updateCharCount() {
   const count = countChars(el('compose-body').value);
@@ -277,7 +330,7 @@ function updateCharCount() {
 }
 
 // 保存（投稿 or 更新）
-el('compose-save-btn').addEventListener('click', () => {
+el('compose-save-btn').addEventListener('click', async () => {
   const title = el('compose-title').value.trim();
   const date  = el('compose-date').value;
   const cat   = el('compose-cat').value;
@@ -288,56 +341,59 @@ el('compose-save-btn').addEventListener('click', () => {
     return;
   }
 
-  const saved = getSaved();
+  const btn = el('compose-save-btn');
+  btn.textContent = '保存中…';
+  btn.disabled    = true;
 
-  if (editingId) {
-    // 更新
-    const updated = { id: editingId, date, category: cat, title, body };
-    const si = saved.findIndex(x => String(x.id)===editingId);
-    if (si >= 0) saved[si] = updated;
-    else saved.push(updated);   // entries.json 由来の記事を初めて編集する場合
-    setSaved(saved);
-
-    const ai = allEntries.findIndex(x => String(x.id)===editingId);
-    if (ai >= 0) allEntries[ai] = updated;
-    toast('記事を更新しました');
-  } else {
-    // 新規
-    const entry = { id: String(Date.now()), date, category: cat, title, body };
-    saved.push(entry);
-    setSaved(saved);
-    allEntries.push(entry);
-    toast('投稿しました！');
+  try {
+    let newEntries;
+    if (editingId) {
+      const updated = { id: editingId, date, category: cat, title, body };
+      newEntries = allEntries.map(e => String(e.id)===editingId ? updated : e);
+      toast('記事を更新しました');
+    } else {
+      const entry = { id: String(Date.now()), date, category: cat, title, body };
+      newEntries = [entry, ...allEntries];
+      toast('投稿しました！');
+    }
+    newEntries = newEntries.sort((a,b) => b.date.localeCompare(a.date));
+    await saveToGitHub(newEntries);
+    allEntries = newEntries;
+    setCache({ entries: allEntries, sha: currentSha });
+    closeCompose();
+    render();
+  } catch(e) {
+    alert('保存に失敗しました: ' + e.message);
+  } finally {
+    btn.textContent = editingId ? '更新する' : '投稿する';
+    btn.disabled    = false;
   }
-
-  allEntries.sort((a,b) => b.date.localeCompare(a.date));
-  closeCompose();
-  render();
 });
 
 // 削除
-el('compose-delete-btn').addEventListener('click', () => {
+el('compose-delete-btn').addEventListener('click', async () => {
   if (!editingId) return;
   const e = allEntries.find(x => String(x.id)===editingId);
   if (!confirm(`「${e?.title||'この記事'}」を削除しますか？`)) return;
 
-  const saved = getSaved().filter(x => String(x.id)!==editingId);
-  setSaved(saved);
+  const btn = el('compose-delete-btn');
+  btn.textContent = '削除中…';
+  btn.disabled    = true;
 
-  // entries.json 由来の記事を「削除」する場合は
-  // 空ボディでもう一度 saved に入れて上書き（表示から消す）
-  const fromBase = !getSaved().find(x=>String(x.id)===editingId);
-  if (fromBase) {
-    // entries.json にあるものは削除フラグ方式
-    const del = getSaved();
-    del.push({ id: editingId, _deleted: true });
-    setSaved(del);
+  try {
+    const newEntries = allEntries.filter(x => String(x.id)!==editingId);
+    await saveToGitHub(newEntries);
+    allEntries = newEntries;
+    setCache({ entries: allEntries, sha: currentSha });
+    closeCompose();
+    render();
+    toast('削除しました');
+  } catch(e) {
+    alert('削除に失敗しました: ' + e.message);
+  } finally {
+    btn.textContent = '削除';
+    btn.disabled    = false;
   }
-
-  allEntries = allEntries.filter(x => String(x.id)!==editingId);
-  closeCompose();
-  render();
-  toast('削除しました');
 });
 
 // ============================================================
@@ -345,19 +401,15 @@ el('compose-delete-btn').addEventListener('click', () => {
 // ============================================================
 function renderCalendar() {
   el('calendar-title').textContent = `${calYear}年 ${calMonth+1}月`;
-
   const map = {};
   allEntries.forEach(e => {
     if (!e.date) return;
     const [y,m] = e.date.split('-').map(Number);
-    if (y===calYear && m===calMonth+1)
-      map[e.date] = countChars(e.body) >= 500;
+    if (y===calYear && m===calMonth+1) map[e.date] = countChars(e.body) >= 500;
   });
-
   const today    = dateStr(new Date());
   const firstDay = new Date(calYear, calMonth, 1).getDay();
   const days     = new Date(calYear, calMonth+1, 0).getDate();
-
   let html = ['日','月','火','水','木','金','土']
     .map(d=>`<div class="cal-day-header">${d}</div>`).join('');
   for (let i=0;i<firstDay;i++) html+='<div class="cal-day other-month"></div>';
@@ -370,7 +422,6 @@ function renderCalendar() {
   }
   el('calendar-grid').innerHTML = html;
 }
-
 el('cal-prev').addEventListener('click',()=>{ if(--calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
 el('cal-next').addEventListener('click',()=>{ if(++calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
 
@@ -414,6 +465,16 @@ function renderStats() {
 }
 
 // ============================================================
+//  まとめて再描画
+// ============================================================
+function render() {
+  renderEntries();
+  renderCalendar();
+  renderStreak();
+  renderStats();
+}
+
+// ============================================================
 //  トースト
 // ============================================================
 function toast(msg) {
@@ -425,44 +486,27 @@ function toast(msg) {
       position:'fixed', bottom:'5rem', left:'50%', transform:'translateX(-50%)',
       background:'#2A6049', color:'#fff', fontSize:'0.82rem',
       padding:'0.55rem 1.2rem', borderRadius:'20px', zIndex:'9999',
-      pointerEvents:'none', opacity:'0', transition:'opacity 0.2s',
-      whiteSpace:'nowrap'
+      pointerEvents:'none', opacity:'0', transition:'opacity 0.2s', whiteSpace:'nowrap'
     });
     document.body.appendChild(t);
   }
   t.textContent = msg;
   t.style.opacity = '1';
   clearTimeout(t._t);
-  t._t = setTimeout(()=>t.style.opacity='0', 2200);
+  t._t = setTimeout(()=>t.style.opacity='0', 2500);
 }
 
 // ============================================================
 //  ユーティリティ
 // ============================================================
-function el(id) { return document.getElementById(id); }
-function show(id) {
-  el(id).style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-}
-function hide(id) {
-  el(id).style.display = 'none';
-  document.body.style.overflow = '';
-}
+function el(id)        { return document.getElementById(id); }
+function show(id)      { el(id).style.display='flex'; document.body.style.overflow='hidden'; }
+function hide(id)      { el(id).style.display='none'; document.body.style.overflow=''; }
 function countChars(s) { return (s||'').replace(/\s/g,'').length; }
-function dateStr(d) {
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-}
-function pad(n) { return String(n).padStart(2,'0'); }
-function fmtDate(s) {
-  if(!s) return '';
-  const [y,m,d]=s.split('-');
-  return `${y}年${Number(m)}月${Number(d)}日`;
-}
-function esc(s) {
-  return String(s||'')
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function dateStr(d)    { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function pad(n)        { return String(n).padStart(2,'0'); }
+function fmtDate(s)    { if(!s) return ''; const[y,m,d]=s.split('-'); return `${y}年${Number(m)}月${Number(d)}日`; }
+function esc(s)        { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ============================================================
 //  起動
