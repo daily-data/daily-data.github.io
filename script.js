@@ -39,6 +39,7 @@ let currentSha      = '';   // entries.json の現在のSHA（更新に必要）
 const API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
 
 async function fetchFromGitHub() {
+  // SHAと内容を取得（書き込み前の最新SHA確認用）
   const res = await fetch(API, {
     headers: {
       'Authorization': `token ${getPAT()}`,
@@ -48,11 +49,13 @@ async function fetchFromGitHub() {
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   const data = await res.json();
   currentSha = data.sha;
-  const json = JSON.parse(atob(data.content.replace(/\n/g,'')));
-  return json;
+  return currentSha;
 }
 
 async function saveToGitHub(entries) {
+  // 書き込み前に必ず最新SHAを取得（競合防止）
+  await fetchFromGitHub();
+
   const content = btoa(unescape(encodeURIComponent(
     JSON.stringify(entries, null, 2)
   )));
@@ -87,7 +90,7 @@ async function boot() {
   calYear  = now.getFullYear();
   calMonth = now.getMonth();
 
-  // キャッシュがあれば先に表示（表示を速くする）
+  // キャッシュがあれば先に即表示（体感速度向上）
   const cache = getCache();
   if (cache) {
     allEntries = cache.entries || [];
@@ -95,24 +98,48 @@ async function boot() {
     render();
   }
 
-  // PATがあればGitHubから最新を取得
-  if (getPAT()) {
-    await refreshFromGitHub();
-  }
-
+  // 常に entries.json を直接fetchして最新表示（認証不要）
+  await refreshEntries();
   updateAdminUI();
 }
 
-async function refreshFromGitHub() {
+// entries.json を直接fetchする（閲覧用・認証不要）
+async function refreshEntries() {
   try {
-    const entries = await fetchFromGitHub();
+    // キャッシュバスターでブラウザキャッシュを回避
+    const url = `${GITHUB_FILE}?_=${Date.now()}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('fetch failed');
+    const entries = await res.json();
     allEntries = entries.sort((a,b) => b.date.localeCompare(a.date));
+    // SHAはPATありのときだけ取得（書き込みに必要）
+    if (getPAT()) await refreshSha();
     setCache({ entries: allEntries, sha: currentSha });
     render();
   } catch (e) {
-    console.warn('GitHub fetch failed:', e.message);
-    // キャッシュのまま続行（オフラインでも閲覧可）
+    console.warn('entries.json fetch failed:', e.message);
+    // キャッシュのまま続行
   }
+}
+
+// SHAだけGitHub APIから取得（書き込み前に必要）
+async function refreshSha() {
+  try {
+    const res = await fetch(API, {
+      headers: {
+        'Authorization': `token ${getPAT()}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      currentSha = data.sha;
+    }
+  } catch(e) { console.warn('SHA fetch failed:', e.message); }
+}
+
+async function refreshFromGitHub() {
+  await refreshEntries();
 }
 
 // ============================================================
