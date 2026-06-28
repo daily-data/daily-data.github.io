@@ -1,10 +1,11 @@
 // ============================================================
 //  ★ 設定（ここだけ書き換えてください）
 // ============================================================
-const ADMIN_PASSWORD = 'data';       // 管理者パスワード
-const GITHUB_OWNER   = 'daily-data';   // GitHubユーザー名
-const GITHUB_REPO    = 'daily-data.github.io'; // リポジトリ名
+const ADMIN_PASSWORD = 'diary2025';       // 管理者パスワード
+const GITHUB_OWNER   = 'your-username';   // GitHubユーザー名
+const GITHUB_REPO    = 'your-username.github.io'; // リポジトリ名
 const GITHUB_FILE    = 'entries.json';    // 記事ファイルのパス
+const GITHUB_IMG_DIR = 'images';           // 画像保存フォルダ
 // PATはログイン後に管理者設定画面から入力します（コードに書かない）
 
 // ============================================================
@@ -29,14 +30,53 @@ function setCache(data)  { localStorage.setItem(CACHE_KEY, JSON.stringify(data))
 // ============================================================
 let allEntries      = [];
 let currentCategory = 'all';
+let currentSort     = 'date-desc';
+let currentSearch   = '';
 let calYear, calMonth;
 let editingId       = null;
 let currentSha      = '';   // entries.json の現在のSHA（更新に必要）
+let pendingImages   = [];   // 投稿パネルで選択中の画像 [{file, dataUrl, name}]
 
 // ============================================================
 //  GitHub API
 // ============================================================
 const API = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`;
+
+// 画像を GitHub にアップロード → URLを返す
+async function uploadImageToGitHub(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = reader.result.split(',')[1];
+        const ext    = file.name.split('.').pop().toLowerCase();
+        const fname  = `${GITHUB_IMG_DIR}/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+        const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${fname}`;
+        const res = await fetch(apiUrl, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `token ${getPAT()}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: `画像を追加: ${fname}`,
+            content: base64
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.message || 'upload failed');
+        }
+        // 公開URL
+        const publicUrl = `https://${GITHUB_OWNER}.github.io/${fname}`;
+        resolve({ url: publicUrl, path: fname });
+      } catch(e) { reject(e); }
+    };
+    reader.onerror = () => reject(new Error('FileReader error'));
+    reader.readAsDataURL(file);
+  });
+}
 
 async function fetchFromGitHub() {
   // SHAと内容を取得（書き込み前の最新SHA確認用）
@@ -223,9 +263,29 @@ function renderEntries() {
   const none = el('no-entries');
   const ok   = isAuthed();
 
-  const filtered = currentCategory === 'all'
-    ? allEntries
+  // カテゴリフィルター
+  let filtered = currentCategory === 'all'
+    ? [...allEntries]
     : allEntries.filter(e => e.category === currentCategory);
+
+  // キーワード検索（タイトル＋本文）
+  if (currentSearch) {
+    const kw = currentSearch.toLowerCase();
+    filtered = filtered.filter(e =>
+      (e.title||'').toLowerCase().includes(kw) ||
+      (e.body||'').toLowerCase().includes(kw)
+    );
+  }
+
+  // ソート
+  filtered.sort((a,b) => {
+    switch(currentSort) {
+      case 'date-asc':   return a.date.localeCompare(b.date);
+      case 'chars-desc': return countChars(b.body) - countChars(a.body);
+      case 'chars-asc':  return countChars(a.body) - countChars(b.body);
+      default:           return b.date.localeCompare(a.date); // date-desc
+    }
+  });
 
   if (!filtered.length) {
     list.innerHTML = '';
@@ -240,6 +300,10 @@ function renderEntries() {
     const achHTML = chars >= 500 ? '<span class="achieved-badge">500字達成</span>' : '';
     const excerpt = (e.body||'').slice(0,80).replace(/\n/g,' ');
     const editBtn = `<button class="edit-btn" data-id="${e.id}" style="display:${ok?'inline-flex':'none'}">編集</button>`;
+    const imgs = e.images || [];
+    const thumbHTML = imgs.length
+      ? `<div class="card-thumbs">${imgs.slice(0,3).map(u=>`<img class="card-thumb" src="${u}" loading="lazy" alt="" />`).join('')}${imgs.length>3?`<span class="card-thumb-more">+${imgs.length-3}</span>`:''}</div>`
+      : '';
     return `<article class="entry-card" data-id="${e.id}">
   <div class="entry-meta">
     <span class="entry-date">${fmtDate(e.date)}</span>
@@ -247,6 +311,7 @@ function renderEntries() {
     ${achHTML}${editBtn}
   </div>
   <h2 class="entry-title">${esc(e.title)}</h2>
+  ${thumbHTML}
   <p class="entry-excerpt">${esc(excerpt)}${(e.body||'').length>80?'…':''}</p>
   <div class="entry-footer">
     <div class="char-mini-bar">
@@ -283,6 +348,18 @@ el('site-nav').addEventListener('click', e => {
   renderEntries();
 });
 
+// ソート
+el('sort-select').addEventListener('change', e => {
+  currentSort = e.target.value;
+  renderEntries();
+});
+
+// キーワード検索（入力するたびに即時絞り込み）
+el('search-input').addEventListener('input', e => {
+  currentSearch = e.target.value.trim();
+  renderEntries();
+});
+
 // ============================================================
 //  詳細モーダル
 // ============================================================
@@ -295,6 +372,11 @@ function openDetail(id) {
   el('modal-chars').textContent = chars.toLocaleString()+' 字';
   el('modal-title').textContent = e.title;
   el('modal-body').textContent  = e.body||'';
+  // 画像
+  const imgs = e.images || [];
+  el('modal-images').innerHTML = imgs.length
+    ? `<div class="modal-img-grid">${imgs.map(u=>`<img class="modal-img" src="${u}" loading="lazy" alt="" onclick="openLightbox('${u}')" />`).join('')}</div>`
+    : '';
   show('modal-overlay');
 }
 el('modal-close').addEventListener('click', () => hide('modal-overlay'));
@@ -332,6 +414,16 @@ function openCompose(id) {
     el('compose-cat').value   = '日記';
     el('compose-body').value  = '';
   }
+  // 画像プレビューを初期化
+  pendingImages = [];
+  if (isEdit) {
+    const entry = allEntries.find(x => String(x.id)===editingId);
+    // 既存画像を pendingImages に読み込む
+    (entry?.images || []).forEach(url => {
+      pendingImages.push({ url, existing: true });
+    });
+  }
+  renderImgPreview();
   updateCharCount();
   show('compose-overlay');
   setTimeout(() => el('compose-title').focus(), 80);
@@ -373,13 +465,29 @@ el('compose-save-btn').addEventListener('click', async () => {
   btn.disabled    = true;
 
   try {
+    // 新規画像をGitHubにアップロード
+    const uploadedUrls = [];
+    const newFiles = pendingImages.filter(p => !p.existing);
+    if (newFiles.length > 0) {
+      btn.textContent = `画像をアップロード中… (0/${newFiles.length})`;
+      for (let i=0; i<newFiles.length; i++) {
+        btn.textContent = `画像をアップロード中… (${i+1}/${newFiles.length})`;
+        const result = await uploadImageToGitHub(newFiles[i].file);
+        uploadedUrls.push(result.url);
+      }
+    }
+    // 既存画像URL ＋ 新規アップロードURL
+    const existingUrls = pendingImages.filter(p => p.existing).map(p => p.url);
+    const allImageUrls = [...existingUrls, ...uploadedUrls];
+
+    btn.textContent = '保存中…';
     let newEntries;
     if (editingId) {
-      const updated = { id: editingId, date, category: cat, title, body };
+      const updated = { id: editingId, date, category: cat, title, body, images: allImageUrls };
       newEntries = allEntries.map(e => String(e.id)===editingId ? updated : e);
       toast('記事を更新しました');
     } else {
-      const entry = { id: String(Date.now()), date, category: cat, title, body };
+      const entry = { id: String(Date.now()), date, category: cat, title, body, images: allImageUrls };
       newEntries = [entry, ...allEntries];
       toast('投稿しました！');
     }
@@ -521,6 +629,79 @@ function toast(msg) {
   t.style.opacity = '1';
   clearTimeout(t._t);
   t._t = setTimeout(()=>t.style.opacity='0', 2500);
+}
+
+// ============================================================
+//  画像UI
+// ============================================================
+
+// ファイル選択ボタン
+el('img-upload-btn').addEventListener('click', () => el('img-file-input').click());
+
+// ファイルが選ばれたとき
+el('img-file-input').addEventListener('change', e => {
+  const files = Array.from(e.target.files);
+  files.forEach(file => {
+    if (file.size > 5 * 1024 * 1024) { alert(`${file.name} は5MBを超えています`); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      pendingImages.push({ file, dataUrl: ev.target.result, existing: false });
+      renderImgPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = ''; // 同じファイルを再選択できるようリセット
+});
+
+// ドラッグ＆ドロップ
+const uploadArea = el('img-upload-area');
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', ()=> uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadArea.classList.remove('drag-over');
+  Array.from(e.dataTransfer.files).forEach(file => {
+    if (!file.type.startsWith('image/')) return;
+    if (file.size > 5*1024*1024) { alert(`${file.name} は5MBを超えています`); return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      pendingImages.push({ file, dataUrl: ev.target.result, existing: false });
+      renderImgPreview();
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+function renderImgPreview() {
+  const wrap = el('img-preview-list');
+  if (!pendingImages.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = pendingImages.map((p,i) => `
+    <div class="img-preview-item">
+      <img src="${p.existing ? p.url : p.dataUrl}" class="img-preview-thumb" alt="" />
+      ${p.existing ? '<span class="img-preview-label">保存済</span>' : '<span class="img-preview-label new">新規</span>'}
+      <button class="img-preview-remove" data-idx="${i}" title="削除">&times;</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.img-preview-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pendingImages.splice(Number(btn.dataset.idx), 1);
+      renderImgPreview();
+    });
+  });
+}
+
+// ライトボックス（モーダル内画像クリック）
+function openLightbox(url) {
+  let lb = document.getElementById('_lightbox');
+  if (!lb) {
+    lb = document.createElement('div');
+    lb.id = '_lightbox';
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:9000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    lb.innerHTML = '<img id="_lb_img" style="max-width:92vw;max-height:92vh;border-radius:4px;object-fit:contain;" />';
+    lb.addEventListener('click', () => lb.style.display = 'none');
+    document.body.appendChild(lb);
+  }
+  document.getElementById('_lb_img').src = url;
+  lb.style.display = 'flex';
 }
 
 // ============================================================
