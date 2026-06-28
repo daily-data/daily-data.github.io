@@ -318,3 +318,187 @@ body {
   margin-top: 0.3rem;
   line-height: 1.5;
 }
+
+/* ===== ソート・検索バー ===== */
+.sort-bar {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-wrap {
+  flex: 1;
+  min-width: 160px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--hint);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.search-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.45rem 0.9rem 0.45rem 2.1rem;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+.search-input:focus { border-color: var(--accent-m); }
+.search-input::placeholder { color: var(--hint); }
+
+.sort-select {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.45rem 2rem 0.45rem 0.9rem;
+  font-family: var(--sans);
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: var(--sub);
+  background: var(--surface);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A09E99' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  white-space: nowrap;
+}
+.sort-select:focus { border-color: var(--accent-m); }
+
+/* ===== 画像アップロードエリア ===== */
+.img-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--r);
+  padding: 0.8rem 1rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.img-upload-area.drag-over {
+  border-color: var(--accent-m);
+  background: var(--accent-l);
+}
+.img-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 0.45rem 0.85rem;
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--sub);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.img-upload-btn:hover { border-color: var(--accent-m); color: var(--accent); background: var(--accent-l); }
+.img-hint { font-size: 0.68rem; color: var(--hint); line-height: 1.4; }
+
+/* プレビューリスト */
+.img-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+}
+.img-preview-item {
+  position: relative;
+  width: 72px;
+}
+.img-preview-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  display: block;
+}
+.img-preview-label {
+  display: block;
+  font-size: 0.58rem;
+  text-align: center;
+  color: var(--hint);
+  margin-top: 2px;
+}
+.img-preview-label.new { color: var(--accent); }
+.img-preview-remove {
+  position: absolute;
+  top: -5px; right: -5px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--text);
+  color: #fff;
+  border: none;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.img-preview-item:hover .img-preview-remove { opacity: 1; }
+
+/* ===== カードのサムネイル ===== */
+.card-thumbs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0.4rem;
+  align-items: center;
+}
+.card-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.card-thumb-more {
+  font-size: 0.72rem;
+  color: var(--hint);
+  margin-left: 0.2rem;
+}
+
+/* ===== モーダル内画像 ===== */
+.modal-img-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.2rem;
+}
+.modal-img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  transition: opacity 0.15s;
+}
+.modal-img:hover { opacity: 0.88; }
+
+@media (max-width: 480px) {
+  .modal-img-grid { grid-template-columns: repeat(2, 1fr); }
+}
