@@ -27,6 +27,7 @@
             <button class="nav-btn" data-category="サウナ">サウナ</button>
             <button class="nav-btn" data-category="旅行">旅行</button>
             <button class="nav-btn" data-category="その他">その他</button>
+            <button class="nav-btn" data-category="本">本</button>
           </nav>
           <!-- 鍵アイコンで管理者ログイン -->
           <button class="lock-btn" id="admin-login-btn" title="管理者ログイン">
@@ -49,6 +50,18 @@
     <div class="container">
       <div class="layout">
         <section class="entries-section">
+          <div class="sort-bar">
+            <div class="search-wrap">
+              <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="search" id="search-input" class="search-input" placeholder="キーワードで検索…" />
+            </div>
+            <select id="sort-select" class="sort-select">
+              <option value="date-desc">新しい順</option>
+              <option value="date-asc">古い順</option>
+              <option value="chars-desc">文字数が多い順</option>
+              <option value="chars-asc">文字数が少ない順</option>
+            </select>
+          </div>
           <div id="entries-list"></div>
           <p id="no-entries" class="no-entries" style="display:none">この条件の記事はまだありません。</p>
         </section>
@@ -96,6 +109,7 @@
         <span class="modal-chars" id="modal-chars"></span>
       </div>
       <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-images" id="modal-images"></div>
       <div class="modal-body"  id="modal-body"></div>
     </div>
   </div>
@@ -136,6 +150,7 @@
             <option value="サウナ">サウナ</option>
             <option value="旅行">旅行</option>
             <option value="その他">その他</option>
+            <option value="本">本</option>
           </select>
         </div>
         <div class="textarea-wrap">
@@ -145,6 +160,18 @@
             <span class="char-count" id="char-count">0 / 500</span>
           </div>
         </div>
+
+        <!-- 画像アップロード -->
+        <div class="img-upload-area" id="img-upload-area">
+          <input type="file" id="img-file-input" accept="image/*" multiple style="display:none" />
+          <button type="button" class="img-upload-btn" id="img-upload-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            写真を追加
+          </button>
+          <p class="img-hint">JPEG / PNG / WEBP · 1枚5MBまで</p>
+        </div>
+        <div class="img-preview-list" id="img-preview-list"></div>
+
       </div>
       <div class="compose-footer">
         <button class="btn-danger" id="compose-delete-btn" style="display:none">削除</button>
