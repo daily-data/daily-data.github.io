@@ -1,9 +1,9 @@
 // ============================================================
 //  ★ 設定（ここだけ書き換えてください）
 // ============================================================
-const ADMIN_PASSWORD = 'diary2025';       // 管理者パスワード
-const GITHUB_OWNER   = 'your-username';   // GitHubユーザー名
-const GITHUB_REPO    = 'your-username.github.io'; // リポジトリ名
+const ADMIN_PASSWORD = 'data';       // 管理者パスワード
+const GITHUB_OWNER   = 'daily-data';   // GitHubユーザー名
+const GITHUB_REPO    = 'daily-data.github.io'; // リポジトリ名
 const GITHUB_FILE    = 'entries.json';    // 記事ファイルのパス
 const GITHUB_IMG_DIR = 'images';           // 画像保存フォルダ
 // PATはログイン後に管理者設定画面から入力します（コードに書かない）
